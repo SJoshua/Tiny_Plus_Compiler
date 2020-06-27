@@ -11,22 +11,22 @@
 
 /* code emitting utilities */
 
-void emit( char * op, char * a, char * b, char * c );
+void emit(char *op, char *a, char *b, char *c);
 void output();
-char * newtemp();
-char * newlabel();
+char *newtemp();
+char *newlabel();
 
 
 /* Function emitSkip skips "howMany" code
  * locations for later backpatch. It also
  * returns the current code position
  */
-int emitSkip( int howMany);
+int emitSkip(int howMany);
 
 /* Procedure emitBackup backs up to 
  * loc = a previously skipped location
  */
-void emitBackup( int loc);
+void emitBackup(int loc);
 
 /* Procedure emitRestore restores the current 
  * code position to the highest previously

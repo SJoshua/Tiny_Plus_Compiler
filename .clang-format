@@ -8,7 +8,7 @@
 
 AccessModifierOffset: -4
 AlignAfterOpenBracket: DontAlign
-AllowShortBlocksOnASingleLine: true
+AllowShortBlocksOnASingleLine: false
 AllowShortFunctionsOnASingleLine: All
 BasedOnStyle: Google
 BraceWrapping:
@@ -35,8 +35,8 @@ IndentWidth: 4
 MaxEmptyLinesToKeep: 10
 NamespaceIndentation: All
 PointerAlignment: Right
-SortIncludes: true
-SortUsingDeclarations: true
+SortIncludes: false
+SortUsingDeclarations: false
 SpaceAfterCStyleCast: true
 SpaceAfterTemplateKeyword: true
 SpaceBeforeAssignmentOperators: true
