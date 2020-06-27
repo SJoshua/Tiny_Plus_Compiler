@@ -11,7 +11,8 @@
 
 /* states in scanner DFA */
 typedef enum
-   { START,INASSIGN,INCOMMENT,INNUM,INID,INLT,INGT,DONE }
+   { START,INASSIGN,INCOMMENT,INNUM,INID,DONE,
+   INSTR,INLE,INGE }
    StateType;
 
 /* lexeme of identifier or reserved word */
@@ -58,8 +59,9 @@ static struct
     } reservedWords[MAXRESERVED]
    = {{"if",IF},{"then",THEN},{"else",ELSE},{"end",END},
       {"repeat",REPEAT},{"until",UNTIL},{"read",READ},
-      {"write",WRITE},{"or",OR},{"and",AND},{"int",INT},
-      {"bool",BOOL},{"char",CHAR},{"while",WHILE},{"DO",DO}};
+      {"write",WRITE},
+	{"true",BTRUE},{"false",BFALSE},{"or",OR},{"and",AND},{"not",NOT},{"int",INT},{"bool",BOOL},
+	{"string",STRING},{"while",WHILE},{"do",DO}};
 
 /* lookup an identifier to see if it is a reserved word */
 /* uses linear search */
@@ -87,7 +89,7 @@ TokenType getToken(void)
    /* flag to indicate save to tokenString */
    int save;
    while (state != DONE)
-   { int c = getNextChar();
+   { char c = getNextChar();
      save = TRUE;
      switch (state)
      { case START:
@@ -97,17 +99,22 @@ TokenType getToken(void)
            state = INID;
          else if (c == ':')
            state = INASSIGN;
-         else if (c == '>')
-           state = INGT;
-         else if (c == '<')
-           state = INLT;
          else if ((c == ' ') || (c == '\t') || (c == '\n'))
            save = FALSE;
          else if (c == '{')
          { save = FALSE;
            state = INCOMMENT;
          }
-         else
+		 else if (c == '\'')
+		 {
+			 save=FALSE;
+			 state = INSTR;
+		 }
+		 else if (c == '<')
+			 state = INLE;
+		 else if (c == '>')
+			 state = INGE;
+		 else
          { state = DONE;
            switch (c)
            { case EOF:
@@ -117,6 +124,9 @@ TokenType getToken(void)
              case '=':
                currentToken = EQ;
                break;
+             case ',':
+				 currentToken = COMMA;
+				 break;
              case '+':
                currentToken = PLUS;
                break;
@@ -138,26 +148,61 @@ TokenType getToken(void)
              case ';':
                currentToken = SEMI;
                break;
-             case ',':
-               currentToken = COMMA;
-               break;
-             case '\'':
-               currentToken = SIQ;
-               break;
              default:
                currentToken = ERROR;
+			   errortype = 1;
                break;
            }
          }
          break;
        case INCOMMENT:
-         save = FALSE;
-         if (c == EOF)
-         { state = DONE;
-           currentToken = ENDFILE;
+         save =FALSE;
+         if (c == EOF )
+         { 
+			 state = DONE;
+           currentToken = ERROR;
+		   errortype = 2;
          }
          else if (c == '}') state = START;
          break;
+	   case INSTR:
+         save=TRUE;
+		 if (c == '\'')
+		 {
+			 save = FALSE;
+			 state = DONE;
+			 currentToken = STR;
+		 }
+		 else if ( c == '\n' || c == EOF )
+		 {
+			 save = FALSE;
+			 currentToken = ERROR;
+			 errortype = 3;
+			 state = DONE;
+		 }
+         break;
+	   case INLE:
+		   state = DONE;
+		   if (c == '=')
+			   currentToken = LE;
+		   else
+		   {
+			   ungetNextChar();
+			   save = FALSE;
+			   currentToken = LT;
+		   }
+		   break;
+	   case INGE:
+		   state = DONE;
+		   if (c == '=')
+			   currentToken = GE;
+		   else
+		   {
+			   ungetNextChar();
+			   save = FALSE;
+			   currentToken = GT;
+		   }
+		   break;
        case INASSIGN:
          state = DONE;
          if (c == '=')
@@ -179,7 +224,7 @@ TokenType getToken(void)
          }
          break;
        case INID:
-         if (!isalpha(c))
+         if (!isalpha(c) && !isdigit(c))
          { /* backup in the input */
            ungetNextChar();
            save = FALSE;
@@ -187,35 +232,12 @@ TokenType getToken(void)
            currentToken = ID;
          }
          break;
-       case INLT:
-         if (c == '=') {
-           save = FALSE;
-           state = DONE;
-           currentToken = NGT;
-         } else {
-           ungetNextChar();
-           save = FALSE;
-           state = DONE;
-           currentToken = LT;
-         }
-         break;
-       case INGT:
-         if (c == '=') {
-           save = FALSE;
-           state = DONE;
-           currentToken = NLT;
-         } else {
-           ungetNextChar();
-           save = FALSE;
-           state = DONE;
-           currentToken = GT;
-         }
-         break;
        case DONE:
        default: /* should never happen */
          fprintf(listing,"Scanner Bug: state= %d\n",state);
          state = DONE;
          currentToken = ERROR;
+		 errortype = 4;
          break;
      }
      if ((save) && (tokenStringIndex <= MAXTOKENLEN))
@@ -226,10 +248,10 @@ TokenType getToken(void)
          currentToken = reservedLookup(tokenString);
      }
    }
-   if (TraceScan) {
+   if (TraceScan && currentToken!=ENDFILE) {
      fprintf(listing,"\t%d: ",lineno);
      printToken(currentToken,tokenString);
    }
+
    return currentToken;
 } /* end getToken */
-

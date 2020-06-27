@@ -6,6 +6,7 @@
 /* Kenneth C. Louden                                */
 /****************************************************/
 
+#include <ctype.h>
 #include "globals.h"
 #include "code.h"
 
@@ -17,41 +18,80 @@ static int emitLoc = 0 ;
    emitBackup, and emitRestore */
 static int highEmitLoc = 0;
 
-/* Procedure emitComment prints a comment line 
- * with comment c in the code file
- */
-void emitComment( char * c )
-{ if (TraceCode) fprintf(code,"* %s\n",c);}
+struct{
+	char *op;
+	char *a;
+	char *b;
+	char *c;
+}mcode[512];	
 
-/* Procedure emitRO emits a register-only
- * TM instruction
- * op = the opcode
- * r = target register
- * s = 1st source register
- * t = 2nd source register
- * c = a comment to be printed if TraceCode is TRUE
- */
-void emitRO( char *op, int r, int s, int t, char *c)
-{ fprintf(code,"%3d:  %5s  %d,%d,%d ",emitLoc++,op,r,s,t);
-  if (TraceCode) fprintf(code,"\t%s",c) ;
-  fprintf(code,"\n") ;
-  if (highEmitLoc < emitLoc) highEmitLoc = emitLoc ;
-} /* emitRO */
+void emit( char * op, char * a, char * b, char * c )
+{
+	mcode[emitLoc].op = (char *)malloc(sizeof(char)*(strlen(op)+1));
+	mcode[emitLoc].a = (char *)malloc(sizeof(char)*(strlen(a)+1));
+	mcode[emitLoc].b = (char *)malloc(sizeof(char)*(strlen(b)+1));
+	mcode[emitLoc].c = (char *)malloc(sizeof(char)*(strlen(c)+1));
+	strcpy(mcode[emitLoc].op, op);
+	strcpy(mcode[emitLoc].a, a);
+	strcpy(mcode[emitLoc].b, b);
+	strcpy(mcode[emitLoc].c, c);
+	emitLoc++;
+	if (highEmitLoc < emitLoc)
+		highEmitLoc = emitLoc;
+}
 
-/* Procedure emitRM emits a register-to-memory
- * TM instruction
- * op = the opcode
- * r = target register
- * d = the offset
- * s = the base register
- * c = a comment to be printed if TraceCode is TRUE
- */
-void emitRM( char * op, int r, int d, int s, char *c)
-{ fprintf(code,"%3d:  %5s  %d,%d(%d) ",emitLoc++,op,r,d,s);
-  if (TraceCode) fprintf(code,"\t%s",c) ;
-  fprintf(code,"\n") ;
-  if (highEmitLoc < emitLoc)  highEmitLoc = emitLoc ;
-} /* emitRM */
+void output()
+{
+	int i;
+	for(i=0;i<highEmitLoc;i++)
+	{
+		if(strcmp(mcode[i].op, "+")==0 ||
+			strcmp(mcode[i].op, "-")==0 ||
+			strcmp(mcode[i].op, "*")==0 ||
+			strcmp(mcode[i].op, "/")==0 ||
+			strcmp(mcode[i].op, "and")==0 ||
+			strcmp(mcode[i].op, "or")==0 ||
+			strcmp(mcode[i].op, "<")==0 ||
+			strcmp(mcode[i].op, "<=")==0 ||
+			strcmp(mcode[i].op, ">")==0 ||
+			strcmp(mcode[i].op, ">=")==0 ||
+			strcmp(mcode[i].op, "=")==0)
+			fprintf(code,"%5d)  %s := %s %s %s\n",i,mcode[i].c,mcode[i].a,mcode[i].op,mcode[i].b);
+		else if(strcmp(mcode[i].op, "read")==0)
+			fprintf(code,"%5d)  %s %s\n",i,mcode[i].op,mcode[i].c);
+		else if(strcmp(mcode[i].op, "write")==0)
+			fprintf(code,"%5d)  %s %s\n",i,mcode[i].op,mcode[i].a);
+		else if(strcmp(mcode[i].op, ":=")==0)
+			fprintf(code,"%5d)  %s %s %s\n",i,mcode[i].c,mcode[i].op,mcode[i].a);
+		else if(strcmp(mcode[i].op, "label")==0 ||
+			strcmp(mcode[i].op, "goto")==0)
+			fprintf(code,"%5d)  %s %s\n",i,mcode[i].op,mcode[i].c);
+		else if(strcmp(mcode[i].op, "j=")==0)
+			fprintf(code,"%5d)  if %s = %s goto %s\n",i,mcode[i].a,mcode[i].b,mcode[i].c);
+	}
+}
+
+char * newtemp()
+{
+	static int n = 0;
+	char tmpn[3]={'\0'};	
+	char * temp = (char *)malloc(sizeof(char)*6);	
+	sprintf(tmpn, "%d", n++);
+	strcpy(temp,"t");
+	strcat(temp,tmpn);
+	return temp;
+}
+
+char * newlabel()
+{
+	static int n = 1;
+	char * temp = (char *)malloc(sizeof(char)*4);
+	char tmpn[3]={'\0'};
+	strcpy(temp,"L");
+	sprintf(tmpn, "%d", n++);
+	strcat(temp,tmpn);
+	return temp;
+}
 
 /* Function emitSkip skips "howMany" code
  * locations for later backpatch. It also
@@ -68,7 +108,7 @@ int emitSkip( int howMany)
  * loc = a previously skipped location
  */
 void emitBackup( int loc)
-{ if (loc > highEmitLoc) emitComment("BUG in emitBackup");
+{ //if (loc > highEmitLoc) emitComment("BUG in emitBackup");
   emitLoc = loc ;
 } /* emitBackup */
 
@@ -78,20 +118,3 @@ void emitBackup( int loc)
  */
 void emitRestore(void)
 { emitLoc = highEmitLoc;}
-
-/* Procedure emitRM_Abs converts an absolute reference 
- * to a pc-relative reference when emitting a
- * register-to-memory TM instruction
- * op = the opcode
- * r = target register
- * a = the absolute location in memory
- * c = a comment to be printed if TraceCode is TRUE
- */
-void emitRM_Abs( char *op, int r, int a, char * c)
-{ fprintf(code,"%3d:  %5s  %d,%d(%d) ",
-               emitLoc,op,r,a-(emitLoc+1),pc);
-  ++emitLoc ;
-  if (TraceCode) fprintf(code,"\t%s",c) ;
-  fprintf(code,"\n") ;
-  if (highEmitLoc < emitLoc) highEmitLoc = emitLoc ;
-} /* emitRM_Abs */

@@ -13,8 +13,10 @@
  * and its lexeme to the listing file
  */
 void printToken( TokenType token, const char* tokenString )
-{ switch (token)
-  { case IF:
+{ char *err;
+	static i;
+	switch (token)
+	{ case IF:
     case THEN:
     case ELSE:
     case END:
@@ -22,47 +24,69 @@ void printToken( TokenType token, const char* tokenString )
     case UNTIL:
     case READ:
     case WRITE:
-    case OR:
-    case AND:
-    case INT:
-    case BOOL:
-    case CHAR:
-    case WHILE:
-    case DO:
+	case BTRUE:
+	case BFALSE:
+	case OR:
+	case AND:
+	case NOT:
+	case INT:
+	case BOOL:
+	case STRING:
+	case WHILE:
+	case DO:
       fprintf(listing,
-         "reserved word: %s\n",tokenString);
+         "(KEY,%s)\n",tokenString);
       break;
-    case ASSIGN: fprintf(listing,":=\n"); break;
-    case LT: fprintf(listing,"<\n"); break;
-    case GT: fprintf(listing,">\n"); break;
-    case NLT: fprintf(listing,">=\n"); break;
-    case NGT: fprintf(listing,"<=\n"); break;
-    case EQ: fprintf(listing,"=\n"); break;
-    case LPAREN: fprintf(listing,"(\n"); break;
-    case RPAREN: fprintf(listing,")\n"); break;
-    case SEMI: fprintf(listing,";\n"); break;
-    case PLUS: fprintf(listing,"+\n"); break;
-    case MINUS: fprintf(listing,"-\n"); break;
-    case TIMES: fprintf(listing,"*\n"); break;
-    case OVER: fprintf(listing,"/\n"); break;
-    case COMMA: fprintf(listing,",\n"); break;
-    case SIQ: fprintf(listing,"'\n"); break;
-    case ENDFILE: fprintf(listing,"EOF\n"); break;
+    case ASSIGN:
+    case LT:
+    case EQ:
+	case GT:
+	case LE:
+	case GE:
+	case COMMA:
+    case LPAREN:
+    case RPAREN:
+    case SEMI:
+    case PLUS:
+    case MINUS:
+    case TIMES:
+    case OVER:
+		fprintf(listing,
+			"(SYM,%s)\n",tokenString);
+		break;
     case NUM:
       fprintf(listing,
-          "NUM, val= %s\n",tokenString);
+          "(NUM,%s)\n",tokenString);
       break;
     case ID:
       fprintf(listing,
-          "ID, name= %s\n",tokenString);
+          "(ID,%s)\n",tokenString);
       break;
+	case STR:
+		fprintf(listing,"(STR,%s)\n",tokenString);
+		break;
+	case ENDFILE:
+		fprintf(listing,"(EOF)\n");
+		break;
     case ERROR:
+	  switch(errortype)
+	  {
+	  case 1:
+		  err = "unknown character";
+		  break;
+	  case 2:
+		  err = "comment missing \'}\'";
+		  break;
+	  case 3:
+		  err = "string missing right quotation";
+		  break;
+	  default:
+		  err = "unknown lexical error";
+	  }
       fprintf(listing,
-          "ERROR: %s\n",tokenString);
+          "Lexical error: %s: \"%s\"\n",err,tokenString);
       break;
-    default: /* should never happen */
-      fprintf(listing,"Unknown token: %d\n",token);
-  }
+	}
 }
 
 /* Function newStmtNode creates a new statement
@@ -158,16 +182,59 @@ void printTree( TreeNode * tree )
         case WriteK:
           fprintf(listing,"Write\n");
           break;
+		case WhileK:	
+			fprintf(listing,"While\n");
+			break;
         default:
           fprintf(listing,"Unknown ExpNode kind\n");
           break;
       }
     }
     else if (tree->nodekind==ExpK)
-    { switch (tree->kind.exp) {
+    { 
+		char *tokenString;
+		switch (tree->kind.exp) {
         case OpK:
           fprintf(listing,"Op: ");
-          printToken(tree->attr.op,"\0");
+		  switch (tree->attr.op){
+		  case PLUS:
+			tokenString = "+";
+			break;
+		  case MINUS:
+			tokenString = "-";
+			break;
+		  case TIMES:
+			tokenString = "*";
+			break;
+		  case OVER:
+			tokenString = "/";
+			break;
+		  case AND:
+			tokenString = "and";
+			break;
+		  case OR:
+			tokenString = "or";
+			break;
+		  case NOT:
+			tokenString = "not";
+			break;
+		  case LT:
+			tokenString = "<";
+			break;
+		  case LE:
+			tokenString = "<=";
+			break;
+		  case EQ:
+			tokenString = "=";
+			break;
+		  case GT:
+			tokenString = ">";
+			break;
+		  case GE:
+			tokenString = ">=";
+			break;
+		  }
+		  printToken(tree->attr.op,tokenString);
           break;
         case ConstK:
           fprintf(listing,"Const: %d\n",tree->attr.val);
@@ -175,6 +242,15 @@ void printTree( TreeNode * tree )
         case IdK:
           fprintf(listing,"Id: %s\n",tree->attr.name);
           break;
+		case StrK:	
+			fprintf(listing,"String: %s\n",tree->attr.name);
+			break;
+		case BoolK:	
+			if(tree->attr.val == 1)
+				fprintf(listing,"Boolean: %s\n","true");
+			else
+				fprintf(listing,"Boolean: %s\n","false");
+			break;
         default:
           fprintf(listing,"Unknown ExpNode kind\n");
           break;

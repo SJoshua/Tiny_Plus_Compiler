@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "globals.h"
 #include "symtab.h"
 
 /* SIZE is the size of the hash table */
@@ -47,6 +48,7 @@ typedef struct LineListRec
  */
 typedef struct BucketListRec
    { char * name;
+	 int type;
      LineList lines;
      int memloc ; /* memory location for variable */
      struct BucketListRec * next;
@@ -55,33 +57,53 @@ typedef struct BucketListRec
 /* the hash table */
 static BucketList hashTable[SIZE];
 
+
+void symtabError(int lineno, char * message)
+{
+	fprintf(listing,"Symbol Table error at line %d: %s\n",lineno,message);
+	Error = TRUE;
+}
+
 /* Procedure st_insert inserts line numbers and
  * memory locations into the symbol table
  * loc = memory location is inserted only the
  * first time, otherwise ignored
  */
-void st_insert( char * name, int lineno, int loc )
+void st_insert( char * name, int type, int lineno, int loc )
 { int h = hash(name);
   BucketList l =  hashTable[h];
   while ((l != NULL) && (strcmp(name,l->name) != 0))
     l = l->next;
   if (l == NULL) /* variable not yet in table */
   { l = (BucketList) malloc(sizeof(struct BucketListRec));
-    l->name = name;
+    l->name = (char *)malloc(strlen(name)+1);
+	strcpy(l->name,name);
+	l->type = type;	
     l->lines = (LineList) malloc(sizeof(struct LineListRec));
     l->lines->lineno = lineno;
     l->memloc = loc;
     l->lines->next = NULL;
     l->next = hashTable[h];
     hashTable[h] = l; }
-  else /* found in table, so just add line number */
-  { LineList t = l->lines;
+  else 
+	  symtabError(lineno,"redeclare indentifier");
+} /* st_insert */
+
+void st_addline( char * name, int lineno)
+{
+	int h = hash(name);
+	LineList t;
+	BucketList l;
+	l =  hashTable[h];
+	while ((l != NULL) && (strcmp(name,l->name) != 0))
+		l = l->next;
+
+	t = l->lines;
     while (t->next != NULL) t = t->next;
     t->next = (LineList) malloc(sizeof(struct LineListRec));
     t->next->lineno = lineno;
     t->next->next = NULL;
-  }
-} /* st_insert */
+}
 
 /* Function st_lookup returns the memory 
  * location of a variable or -1 if not found
@@ -92,7 +114,19 @@ int st_lookup ( char * name )
   while ((l != NULL) && (strcmp(name,l->name) != 0))
     l = l->next;
   if (l == NULL) return -1;
-  else return l->memloc;
+  else
+	  return l->memloc;
+}
+
+int st_gettype ( char * name)
+{
+	int h = hash(name);
+	BucketList l =  hashTable[h];
+	while ((l != NULL) && (strcmp(name,l->name) != 0))
+		l = l->next;
+	if (l == NULL) return -1;
+	else
+		return l->type;
 }
 
 /* Procedure printSymTab prints a formatted 
